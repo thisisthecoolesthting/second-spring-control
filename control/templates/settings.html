@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Settings | Second Spring Control{% endblock %}
+
+{% block content %}
+<section class="card">
+  <h2>Settings</h2>
+  <p class="muted">All settings come from your <code>.env</code> file. Edit and restart the controller to apply.</p>
+
+  <table class="data">
+    <tbody>
+      <tr><th>OpenAI API key</th><td>{% if settings.openai_configured %}<span class="pill ok">configured</span>{% else %}<span class="pill warn">not set</span>{% endif %}</td></tr>
+      <tr><th>Draft model</th><td><code>{{ settings.openai_model_draft }}</code></td></tr>
+      <tr><th>Pillar model</th><td><code>{{ settings.openai_model_pillar }}</code></td></tr>
+      <tr><th>Safety model</th><td><code>{{ settings.openai_model_safety }}</code></td></tr>
+      <tr><th>Max parallel drafts</th><td>{{ settings.max_parallel_drafts }}</td></tr>
+      <tr><th>Site URL</th><td><a href="{{ settings.site_url }}" target="_blank">{{ settings.site_url }}</a></td></tr>
+      <tr><th>Astro repo dir</th><td><code>{{ settings.astro_repo_dir }}</code></td></tr>
+      <tr><th>Astro content dir</th><td><code>{{ settings.astro_content_dir }}</code></td></tr>
+      <tr><th>Scout products.json</th><td><code>{{ settings.scout_products_json }}</code></td></tr>
+      <tr><th>Associate tag</th><td><code>{{ settings.associate_tag }}</code></td></tr>
+      <tr><th>Auto-push on publish</th><td>{{ settings.auto_push }}</td></tr>
+      <tr><th>DB path</th><td><code>{{ settings.control_db_path }}</code></td></tr>
+    </tbody>
+  </table>
+</section>
+{% endblock %}

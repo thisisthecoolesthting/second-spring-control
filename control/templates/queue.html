@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Queue | Second Spring Control{% endblock %}
+
+{% block content %}
+<section class="card">
+  <div class="row">
+    <h2>Queue {% if current_stage %}— stage: <code>{{ current_stage }}</code>{% endif %}</h2>
+    <div class="filter">
+      <a href="/queue" class="{% if not current_stage %}active{% endif %}">all</a>
+      {% for s in stages %}
+        <a href="/queue?stage={{ s }}" class="{% if current_stage == s %}active{% endif %}">{{ s }}</a>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% if items %}
+    <div id="bulk-bar" class="bulk-bar" style="display:none">
+      <span><strong id="sel-count">0</strong> selected</span>
+      <button class="primary small" onclick="bulkAction('auto-pipeline')">Auto-pipeline (draft → critique → advance)</button>
+      <button class="small" onclick="bulkAction('draft')">Draft only</button>
+      <button class="primary small" onclick="bulkAction('publish')">Publish (ready items)</button>
+      <button class="ghost small" onclick="clearSel()">Clear</button>
+      <span id="bulk-status" class="muted small"></span>
+    </div>
+
+    <table class="data">
+      <thead>
+        <tr>
+          <th><input type="checkbox" id="select-all"></th>
+          <th>Title</th><th>Type</th><th>Stage</th><th>Cat</th><th>Score</th><th>ASIN</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+          <tr>
+            <td><input type="checkbox" class="row-check" data-id="{{ item.id }}" data-stage="{{ item.stage }}"></td>
+            <td><a href="/items/{{ item.id }}">{{ item.title }}</a></td>
+            <td>{{ item.type }}</td>
+            <td><span class="stage-tag s-{{ item.stage }}">{{ item.stage }}</span></td>
+            <td>{{ item.category or '—' }}</td>
+            <td>{{ '%.2f' % item.score }}</td>
+            <td><code>{{ item.asin or '—' }}</code></td>
+            <td><a href="/items/{{ item.id }}/edit" class="link">edit</a></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">Nothing here. Try another stage filter or import from scout.</p>
+  {% endif %}
+</section>
+
+<script>
+const checks = () => Array.from(document.querySelectorAll('.row-check'));
+const selected = () => checks().filter(c => c.checked);
+const bar = document.getElementById('bulk-bar');
+const cnt = document.getElementById('sel-count');
+
+function refreshBar() {
+  const n = selected().length;
+  cnt.textContent = n;
+  bar.style.display = n > 0 ? 'flex' : 'none';
+}
+function clearSel() {
+  checks().forEach(c => { c.checked = false; });
+  document.getElementById('select-all').checked = false;
+  refreshBar();
+}
+document.getElementById('select-all')?.addEventListener('change', (e) => {
+  checks().forEach(c => { c.checked = e.target.checked; });
+  refreshBar();
+});
+checks().forEach(c => c.addEventListener('change', refreshBar));
+
+async function bulkAction(kind) {
+  const ids = selected().map(c => c.dataset.id);
+  if (!ids.length) return;
+  const status = document.getElementById('bulk-status');
+  status.textContent = `${kind} on ${ids.length} items... (this can take 60-180s)`;
+  const fd = new FormData();
+  fd.append('item_ids', ids.join(','));
+  try {
+    const r = await fetch(`/bulk/${kind}`, { method: 'POST', body: fd });
+    const j = await r.json();
+    if (kind === 'draft') {
+      status.innerHTML = `Drafted ${j.ok}, errors ${j.errors}, cost $${(j.total_cost||0).toFixed(4)}.`;
+    } else if (kind === 'auto-pipeline') {
+      status.innerHTML = `Auto-pipeline: ${j.advanced} advanced to edited, ${j.needs_human} need review, ${j.errors} errors.`;
+    } else {
+      status.innerHTML = `Published ${j.ok}, errors ${j.errors}.`;
+    }
+    setTimeout(() => window.location.reload(), 2500);
+  } catch (e) {
+    status.innerHTML = `<span class="error">Error: ${e}</span>`;
+  }
+}
+</script>
+{% endblock %}

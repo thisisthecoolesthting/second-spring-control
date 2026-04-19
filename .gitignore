@@ -1,0 +1,13 @@
+.venv/
+.env
+.env.txt
+.env.txt.*
+.env.*
+!.env.example
+control.db
+__pycache__/
+*.pyc
+.deps_installed
+.pytest_cache/
+*.OLD*
+*.OLD-ROTATE-*

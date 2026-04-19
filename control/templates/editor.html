@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Edit: {{ item.title }} | Second Spring Control{% endblock %}
+
+{% block content %}
+<section class="card editor-card">
+  <div class="row">
+    <h2>Edit: {{ item.title }}</h2>
+    <span class="stage-tag s-{{ item.stage }}">{{ item.stage }}</span>
+  </div>
+  <p class="muted small">
+    Cmd/Ctrl+S to save. Cmd/Ctrl+Enter to save and mark edited. Esc to go back.
+  </p>
+
+  <form id="edit-form" method="post">
+    <textarea
+      id="edited"
+      name="edited_md"
+      rows="32"
+      class="editor"
+      spellcheck="true"
+    >{{ item.edited_md or item.draft_md or item.skeleton_md or '' }}</textarea>
+  </form>
+
+  <div class="actions sticky-bottom">
+    <button id="save-btn" class="primary">Save</button>
+    <button id="finish-btn" class="primary">Save and mark edited</button>
+    <a href="/items/{{ item.id }}" class="btn ghost">Back</a>
+    <span id="save-status" class="muted small"></span>
+  </div>
+</section>
+
+<script>
+const itemId = {{ item.id }};
+const ed = document.getElementById('edited');
+const status = document.getElementById('save-status');
+let dirty = false;
+let saving = false;
+let lastSaved = ed.value;
+
+ed.addEventListener('input', () => { dirty = true; status.textContent = 'unsaved'; });
+
+async function save() {
+  if (saving || !dirty) return;
+  saving = true;
+  status.textContent = 'saving...';
+  const fd = new FormData();
+  fd.append('edited_md', ed.value);
+  const r = await fetch(`/items/${itemId}/save`, { method: 'POST', body: fd });
+  saving = false;
+  if (r.ok) {
+    dirty = false;
+    lastSaved = ed.value;
+    const t = new Date().toLocaleTimeString();
+    status.textContent = `saved at ${t}`;
+  } else {
+    status.textContent = 'save failed';
+  }
+}
+
+async function finish() {
+  await save();
+  const fd = new FormData();
+  fd.append('to_stage', 'edited');
+  const r = await fetch(`/items/${itemId}/transition`, { method: 'POST', body: fd });
+  if (r.redirected) {
+    window.location.href = r.url;
+  } else if (r.ok) {
+    window.location.href = `/items/${itemId}`;
+  } else {
+    const j = await r.json();
+    status.textContent = 'cannot advance: ' + (j.error || 'unknown');
+  }
+}
+
+document.getElementById('save-btn').addEventListener('click', (e) => { e.preventDefault(); save(); });
+document.getElementById('finish-btn').addEventListener('click', (e) => { e.preventDefault(); finish(); });
+
+document.addEventListener('keydown', (e) => {
+  const cmd = e.metaKey || e.ctrlKey;
+  if (cmd && e.key === 's') { e.preventDefault(); save(); }
+  if (cmd && e.key === 'Enter') { e.preventDefault(); finish(); }
+  if (e.key === 'Escape') { window.location.href = `/items/${itemId}`; }
+});
+
+// Auto-save every 30 seconds if dirty.
+setInterval(() => { if (dirty) save(); }, 30000);
+
+// Warn before leaving with unsaved changes.
+window.addEventListener('beforeunload', (e) => {
+  if (dirty) { e.preventDefault(); e.returnValue = ''; }
+});
+</script>
+{% endblock %}

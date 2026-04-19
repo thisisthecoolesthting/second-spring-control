@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Dashboard | Second Spring Control{% endblock %}
+
+{% block autorefresh %}
+  {% if settings.dashboard_refresh_sec and settings.dashboard_refresh_sec > 0 %}
+    <meta http-equiv="refresh" content="{{ settings.dashboard_refresh_sec }}">
+  {% endif %}
+{% endblock %}
+
+{% set job_rows = [
+  ("advance", "Auto-advance", "edited to ready_to_publish every " ~ settings.auto_advance_interval_sec ~ "s",
+    settings.auto_advance_enabled, scheduler_runs.auto_advance),
+  ("scout",   "Auto-scout",   "Keepa refresh every " ~ settings.auto_scout_interval_hours ~ "h",
+    settings.auto_scout_enabled, scheduler_runs.auto_scout),
+  ("publish", "Auto-publish", settings.auto_publish_batch|string ~ " items every " ~ settings.auto_publish_interval_min ~ "m",
+    settings.auto_publish_enabled, scheduler_runs.auto_publish),
+  ("ideas",   "Auto-ideas",   "brainstorm when backlog < " ~ settings.auto_ideas_min_backlog,
+    settings.auto_ideas_enabled, scheduler_runs.auto_ideas)
+] %}
+
+{% block content %}
+<section class="grid two">
+  <div class="card">
+    <h2>What's next</h2>
+    {% if next_items %}
+      <ol class="next-list">
+        {% for item in next_items %}
+          <li>
+            <a href="/items/{{ item.id }}">
+              <span class="stage-tag s-{{ item.stage }}">{{ item.stage }}</span>
+              <span class="title">{{ item.title }}</span>
+            </a>
+            <span class="meta">score {{ '%.2f' % item.score }}</span>
+          </li>
+        {% endfor %}
+      </ol>
+    {% else %}
+      <p class="muted">Nothing in flight. <a href="/ideas">Add an idea</a> or <form action="/scout/import" method="post" style="display:inline"><button class="link">import from scout</button></form>.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>OpenAI spend</h2>
+    <p class="big">${{ '%.2f' % today_spend }}</p>
+    <p class="muted">today</p>
+    <p class="big">${{ '%.2f' % total_spend }}</p>
+    <p class="muted">all time</p>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Recent activity</h2>
+  {% if recent_events %}
+    <ul class="event-list">
+      {% for e in recent_events %}
+        <li>
+          <span class="ts">{{ e.created_at }}</span>
+          <span class="actor">{{ e.actor }}</span>
+          <a href="/items/{{ e.item_id }}">{{ e.title or e.slug }}</a>
+          <span class="transition">{{ e.from_stage or '∅' }} → <strong>{{ e.to_stage }}</strong></span>
+          {% if e.note %}<span class="note">{{ e.note }}</span>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted">No activity yet.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Automation status</h2>
+  <table class="data">
+    <thead>
+      <tr><th>Job</th><th>Enabled</th><th>Cadence</th><th>Last run</th><th>Last result</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for key, label, cadence, enabled, state in job_rows %}
+        <tr>
+          <td><strong>{{ label }}</strong></td>
+          <td>
+            {% if enabled %}<span class="pill ok">on</span>
+            {% else %}<span class="pill warn">off</span>{% endif %}
+          </td>
+          <td class="muted small">{{ cadence }}</td>
+          <td class="muted small">{{ state.at or '— never' }}</td>
+          <td class="small">
+            {% if state.error %}<span class="error">{{ state.error[:120] }}</span>
+            {% elif key == 'advance' %}moved {{ state.moved }}
+            {% elif key == 'scout' %}imported {{ state.imported }}, drafted {{ state.drafted }}
+            {% elif key == 'publish' %}published {{ state.published }}
+            {% elif key == 'ideas' %}inserted {{ state.inserted }} ({{ state.topic or '—' }})
+            {% endif %}
+          </td>
+          <td>
+            <button class="small" onclick="runJob('{{ key }}', this)">Run now</button>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="muted small" id="run-status" style="margin-top:8px"></p>
+</section>
+
+<section class="card">
+  <h2>Recent AI requests</h2>
+  {% if recent_ai_requests %}
+    <table class="data">
+      <thead><tr><th>When</th><th>Purpose</th><th>Model</th><th>Cost</th><th>Status</th><th>Item</th></tr></thead>
+      <tbody>
+      {% for r in recent_ai_requests %}
+        <tr>
+          <td class="muted small">{{ r.created_at }}</td>
+          <td>{{ r.purpose }}</td>
+          <td><code>{{ r.model }}</code></td>
+          <td>${{ '%.4f' % (r.cost_usd or 0) }}</td>
+          <td>{% if r.status == 'ok' %}<span class="pill ok">ok</span>{% else %}<span class="pill warn">{{ r.status }}</span>{% endif %}</td>
+          <td class="muted small">{{ (r.title or '—')[:50] }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">No AI calls yet.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Quick actions</h2>
+  <form action="/scout/import" method="post" class="inline">
+    <label>Min score:
+      <input type="number" name="min_score" value="0" step="0.001" min="0" style="width:6em">
+    </label>
+    <label>Max items:
+      <input type="number" name="max_items" value="100" min="1" style="width:6em">
+    </label>
+    <button class="primary">Import from scout</button>
+  </form>
+</section>
+
+<script>
+async function runJob(name, btn) {
+  const status = document.getElementById('run-status');
+  btn.disabled = true;
+  status.textContent = 'Running ' + name + '... (this can take a minute)';
+  try {
+    const r = await fetch('/scheduler/run/' + name, { method: 'POST' });
+    const j = await r.json();
+    if (j.ok) {
+      status.innerHTML = '<strong>' + name + ':</strong> ' + JSON.stringify(j.result);
+      setTimeout(() => window.location.reload(), 2000);
+    } else {
+      status.innerHTML = '<span class="error">' + name + ' failed: ' + j.error + '</span>';
+    }
+  } catch (e) {
+    status.innerHTML = '<span class="error">' + e + '</span>';
+  } finally {
+    btn.disabled = false;
+  }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,182 @@
+[
+  {
+    "title": "What's actually happening in perimenopause: a plain-English guide",
+    "type": "pillar",
+    "target_keyword": "what is perimenopause",
+    "notes": "Anchor pillar. Reframes perimenopause as a renewal phase. Cites Menopause Society, NIH. Ends with a roadmap to other Second Spring guides."
+  },
+  {
+    "title": "Hot flashes and night sweats: the complete cooling toolkit",
+    "type": "pillar",
+    "target_keyword": "best products for hot flashes",
+    "notes": "Pillar. Behavioral interventions first, then a layered product stack: cooling pillows, sheets, pajamas, fans, mattress toppers."
+  },
+  {
+    "title": "Sleep through perimenopause: what actually works",
+    "type": "pillar",
+    "target_keyword": "perimenopause sleep",
+    "notes": "Pillar. Sleep hygiene + magnesium glycinate + sound machines + cooling. Safety section on sleep aids."
+  },
+  {
+    "title": "Strength training for women over 45: bone density, sarcopenia, and confidence",
+    "type": "pillar",
+    "target_keyword": "strength training over 45",
+    "notes": "Pillar. Weighted vests, resistance bands, kettlebells. Reference DEXA + recent studies on resistance training in midlife."
+  },
+  {
+    "title": "Skincare for hormonal change: retinol, peptides, and what to skip",
+    "type": "pillar",
+    "target_keyword": "perimenopause skincare",
+    "notes": "Pillar. Retinol routine, hyaluronic acid, when to add a peptide, why most marketing claims are noise."
+  },
+  {
+    "title": "Best cooling pillow for hot flashes",
+    "type": "product",
+    "target_keyword": "cooling pillow hot flashes",
+    "notes": "Top product page. Test 5-7 options. High purchase intent."
+  },
+  {
+    "title": "Best cooling sheets for menopause night sweats",
+    "type": "product",
+    "target_keyword": "cooling sheets menopause",
+    "notes": "Companion to pillow page. Compare bamboo, eucalyptus, percale. Price-tier comparison."
+  },
+  {
+    "title": "Best cooling pajamas for night sweats",
+    "type": "product",
+    "target_keyword": "cooling pajamas women",
+    "notes": "Apparel category, 4% commission. Lower-priced repeat purchase."
+  },
+  {
+    "title": "Best magnesium glycinate for sleep and perimenopause",
+    "type": "product",
+    "target_keyword": "magnesium glycinate menopause",
+    "notes": "Supplement category. SAFETY section critical. Compare doses and forms."
+  },
+  {
+    "title": "Best weighted vests for women over 50",
+    "type": "product",
+    "target_keyword": "weighted vest for women 50",
+    "notes": "Bone density angle. Cite recent literature. 6-12 lb sweet spot."
+  },
+  {
+    "title": "Best books on perimenopause and menopause",
+    "type": "product",
+    "target_keyword": "best menopause books",
+    "notes": "Books = 4.5% commission. Mary Claire Haver, Davina McCall, Maisie Hill, Jen Gunter."
+  },
+  {
+    "title": "Best mattress topper for hot sleepers in menopause",
+    "type": "product",
+    "target_keyword": "cooling mattress topper menopause",
+    "notes": "Higher price point. Gel, latex, phase-change material."
+  },
+  {
+    "title": "Best moisturizers for menopausal dry skin",
+    "type": "product",
+    "target_keyword": "menopause dry skin moisturizer",
+    "notes": "Beauty / Luxury Beauty category. Higher commission tier."
+  },
+  {
+    "title": "Best vaginal moisturizers and lubricants for perimenopause",
+    "type": "product",
+    "target_keyword": "vaginal moisturizer menopause",
+    "notes": "High-intent, underserved query. SAFETY section: distinguish moisturizer vs lubricant, ingredient considerations."
+  },
+  {
+    "title": "Does magnesium glycinate help hot flashes",
+    "type": "article",
+    "target_keyword": "magnesium hot flashes",
+    "notes": "Direct-answer Q&A. Links to magnesium product page and sleep pillar."
+  },
+  {
+    "title": "Can I take ashwagandha during perimenopause",
+    "type": "article",
+    "target_keyword": "ashwagandha perimenopause",
+    "notes": "Q&A. Real safety considerations: thyroid, autoimmune, pregnancy."
+  },
+  {
+    "title": "What's the difference between perimenopause and menopause",
+    "type": "article",
+    "target_keyword": "perimenopause vs menopause",
+    "notes": "Definitional Q&A. Likely to win a featured snippet."
+  },
+  {
+    "title": "How long does perimenopause typically last",
+    "type": "article",
+    "target_keyword": "how long does perimenopause last",
+    "notes": "Direct-answer Q&A. Cites Menopause Society timeline."
+  },
+  {
+    "title": "Why am I waking up at 3am during perimenopause",
+    "type": "article",
+    "target_keyword": "waking up 3am perimenopause",
+    "notes": "Highly specific search query. Cortisol + estrogen drop angle. Links to sleep pillar."
+  },
+  {
+    "title": "Best teas for menopause hot flashes and sleep",
+    "type": "article",
+    "target_keyword": "best teas for menopause",
+    "notes": "Hybrid product+article. Sage, valerian, chamomile, red clover."
+  },
+  {
+    "title": "Brain fog in perimenopause: causes and what helps",
+    "type": "article",
+    "target_keyword": "perimenopause brain fog",
+    "notes": "Pillar-adjacent article. Sleep + estrogen receptors in the brain."
+  },
+  {
+    "title": "Estrogen and bone density: why strength training matters now",
+    "type": "article",
+    "target_keyword": "estrogen bone density",
+    "notes": "Supports the strength training pillar. Cites osteoporosis risk."
+  },
+  {
+    "title": "Best pelvic floor exercise tools for women over 45",
+    "type": "product",
+    "target_keyword": "pelvic floor trainer",
+    "notes": "Underserved category. Med-grade and consumer options. Some have safety considerations."
+  },
+  {
+    "title": "Best red light therapy devices for perimenopause skin",
+    "type": "product",
+    "target_keyword": "red light therapy menopause",
+    "notes": "Higher price point, growing trend, currently low affiliate competition."
+  },
+  {
+    "title": "Best fans for menopause hot flashes (clip-on, desk, neck)",
+    "type": "product",
+    "target_keyword": "best fan for hot flashes",
+    "notes": "Lower price point but high volume. Multi-product roundup."
+  },
+  {
+    "title": "Is hormone replacement therapy right for me — questions to ask your doctor",
+    "type": "article",
+    "target_keyword": "is HRT right for me",
+    "notes": "Editorial article (no products). Builds trust + email captures. Honest, not pushing for or against HRT."
+  },
+  {
+    "title": "Best cooling neck wraps and gel packs for hot flashes",
+    "type": "product",
+    "target_keyword": "cooling neck wrap hot flashes",
+    "notes": "Sub-niche to cooling toolkit pillar. Lower price, repeat purchase."
+  },
+  {
+    "title": "What to eat during perimenopause: a registered dietitian's framework",
+    "type": "pillar",
+    "target_keyword": "perimenopause diet",
+    "notes": "Pillar. Protein, fiber, calcium, blood sugar. Links to supplement and book reviews. Safety/medical disclaimer at top."
+  },
+  {
+    "title": "Best protein powders for women in perimenopause",
+    "type": "product",
+    "target_keyword": "best protein powder women 50",
+    "notes": "Supplement category, ties to muscle preservation pillar."
+  },
+  {
+    "title": "Best resistance bands for women starting strength training in midlife",
+    "type": "product",
+    "target_keyword": "resistance bands women beginner",
+    "notes": "Entry product to strength pillar. Low price, low intimidation."
+  }
+]

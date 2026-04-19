@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}{{ item.title }} | Second Spring Control{% endblock %}
+
+{% block content %}
+<section class="card">
+  <div class="row">
+    <h2>{{ item.title }}</h2>
+    <span class="stage-tag s-{{ item.stage }} big">{{ item.stage }}</span>
+  </div>
+  <p class="muted">
+    {{ item.type }} &middot; {{ item.category or 'no category' }}
+    {% if item.asin %} &middot; <code>{{ item.asin }}</code>{% endif %}
+    &middot; score {{ '%.3f' % item.score }}
+  </p>
+
+  <div class="actions">
+    {% if item.stage == 'skeleton' %}
+      <form action="/items/{{ item.id }}/draft" method="post"
+            hx-post="/items/{{ item.id }}/draft" hx-swap="none"
+            hx-on::after-request="window.location.reload()">
+        <button class="primary">Generate AI draft</button>
+      </form>
+    {% endif %}
+    {% if item.stage in ('draft_ready', 'editing', 'edited') %}
+      <a href="/items/{{ item.id }}/edit" class="btn primary">Open editor</a>
+    {% endif %}
+    {% if item.stage == 'ready_to_publish' %}
+      <form action="/items/{{ item.id }}/publish" method="post"
+            hx-post="/items/{{ item.id }}/publish" hx-swap="none"
+            hx-on::after-request="window.location.reload()">
+        <button class="primary">Publish to VPS</button>
+      </form>
+    {% endif %}
+
+    {% if valid_next %}
+      <form action="/items/{{ item.id }}/transition" method="post" class="inline">
+        <select name="to_stage">
+          {% for s in valid_next %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+        </select>
+        <input name="note" placeholder="optional note" style="flex:1">
+        <button>Advance stage</button>
+      </form>
+    {% endif %}
+  </div>
+
+  {% if item.error %}
+    <p class="error">Last error: {{ item.error }}</p>
+  {% endif %}
+</section>
+
+{% if item.skeleton_md %}
+<section class="card">
+  <h3>Skeleton</h3>
+  <pre class="md">{{ item.skeleton_md }}</pre>
+</section>
+{% endif %}
+
+{% if item.draft_md %}
+<section class="card">
+  <h3>AI Draft</h3>
+  <pre class="md">{{ item.draft_md }}</pre>
+</section>
+{% endif %}
+
+{% if item.edited_md %}
+<section class="card">
+  <h3>Edited (final)</h3>
+  <pre class="md">{{ item.edited_md }}</pre>
+</section>
+{% endif %}
+
+<section class="card">
+  <h3>AI requests ({{ ai_requests|length }})</h3>
+  {% if ai_requests %}
+    <table class="data">
+      <thead><tr><th>When</th><th>Purpose</th><th>Model</th><th>Tokens</th><th>Cost</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for r in ai_requests %}
+        <tr>
+          <td class="muted">{{ r.created_at }}</td>
+          <td>{{ r.purpose }}</td>
+          <td><code>{{ r.model }}</code></td>
+          <td>{{ r.completion_tokens or '—' }}</td>
+          <td>${{ '%.4f' % (r.cost_usd or 0) }}</td>
+          <td>{{ r.status }}{% if r.error %} <span class="error">{{ r.error[:80] }}</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">No AI calls yet.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h3>Event log</h3>
+  <ul class="event-list">
+    {% for e in events %}
+      <li>
+        <span class="ts">{{ e.created_at }}</span>
+        <span class="actor">{{ e.actor }}</span>
+        {{ e.from_stage or '∅' }} → <strong>{{ e.to_stage }}</strong>
+        {% if e.note %}<span class="note">— {{ e.note }}</span>{% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

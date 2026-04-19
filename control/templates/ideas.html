@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Ideas | Second Spring Control{% endblock %}
+
+{% block content %}
+<section class="card">
+  <h2>Capture an idea</h2>
+  <form action="/ideas" method="post" class="form-grid">
+    <label>Title
+      <input name="title" required placeholder="Best cooling sheets for hot flashes">
+    </label>
+    <label>Type
+      <select name="type">
+        <option value="product">product</option>
+        <option value="pillar">pillar</option>
+        <option value="article">article</option>
+      </select>
+    </label>
+    <label>Target keyword
+      <input name="target_keyword" placeholder="cooling sheets menopause">
+    </label>
+    <label class="full">Notes
+      <textarea name="notes" rows="3" placeholder="Why this matters, who it's for, any sources..."></textarea>
+    </label>
+    <button class="primary">Save idea</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Backlog ({{ ideas|length }})</h2>
+  {% if ideas %}
+    <div id="bulk-bar" class="bulk-bar" style="display:none">
+      <span><strong id="sel-count">0</strong> selected</span>
+      <button class="primary small" onclick="bulkPromote()">Promote selected</button>
+      <button class="ghost small" onclick="clearSel()">Clear</button>
+      <span id="bulk-status" class="muted small"></span>
+    </div>
+
+    <table class="data">
+      <thead>
+        <tr>
+          <th><input type="checkbox" id="select-all"></th>
+          <th>Title</th><th>Type</th><th>Keyword</th><th>Source</th><th>Created</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for idea in ideas %}
+          <tr>
+            <td><input type="checkbox" class="row-check" data-id="{{ idea.id }}"></td>
+            <td>{{ idea.title }}</td>
+            <td>{{ idea.type }}</td>
+            <td><code>{{ idea.target_keyword or '—' }}</code></td>
+            <td>{{ idea.source }}</td>
+            <td class="muted">{{ idea.created_at[:10] }}</td>
+            <td>
+              <form action="/ideas/{{ idea.id }}/promote" method="post" style="display:inline">
+                <button class="primary small">Promote</button>
+              </form>
+              <form action="/ideas/{{ idea.id }}/reject" method="post" style="display:inline">
+                <button class="ghost small">Reject</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <script>
+    const checks = () => Array.from(document.querySelectorAll('.row-check'));
+    const selected = () => checks().filter(c => c.checked);
+    const bar = document.getElementById('bulk-bar');
+    const cnt = document.getElementById('sel-count');
+    function refreshBar() { const n = selected().length; cnt.textContent = n; bar.style.display = n > 0 ? 'flex' : 'none'; }
+    function clearSel() { checks().forEach(c => c.checked = false); document.getElementById('select-all').checked = false; refreshBar(); }
+    document.getElementById('select-all').addEventListener('change', e => { checks().forEach(c => c.checked = e.target.checked); refreshBar(); });
+    checks().forEach(c => c.addEventListener('change', refreshBar));
+    async function bulkPromote() {
+      const ids = selected().map(c => c.dataset.id);
+      if (!ids.length) return;
+      const status = document.getElementById('bulk-status');
+      status.textContent = `Promoting ${ids.length}...`;
+      const fd = new FormData(); fd.append('idea_ids', ids.join(','));
+      const r = await fetch('/bulk/promote', { method: 'POST', body: fd });
+      const j = await r.json();
+      status.textContent = `Promoted ${j.promoted}.`;
+      setTimeout(() => window.location.reload(), 800);
+    }
+    </script>
+  {% else %}
+    <p class="muted">No ideas yet. Add one above, brainstorm via <a href="/research">Research</a>, or seed the perimenopause starter pack.</p>
+  {% endif %}
+</section>
+{% endblock %}

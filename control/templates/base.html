@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Second Spring Control{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  {# Only auto-refresh pages that opt in via the `autorefresh` block. #}
+  {% block autorefresh %}{% endblock %}
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <a href="/">Second Spring <span>Control</span></a>
+    </div>
+    <nav>
+      <a href="/">Dashboard</a>
+      <a href="/research">Research</a>
+      <a href="/ideas">Ideas</a>
+      <a href="/queue">Queue</a>
+      <a href="/settings">Settings</a>
+    </nav>
+    <div class="status">
+      {% if settings.openai_configured %}
+        <span class="pill ok">OpenAI ready</span>
+      {% else %}
+        <span class="pill warn">OpenAI not set</span>
+      {% endif %}
+    </div>
+  </header>
+
+  <aside class="stage-strip">
+    {% for stage, count in stage_counts.items() %}
+      <a href="/queue?stage={{ stage }}" class="stage-chip">
+        <span class="label">{{ stage }}</span>
+        <span class="count">{{ count }}</span>
+      </a>
+    {% endfor %}
+  </aside>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="footnote">
+    Local controller. Pushes to {{ settings.site_url }}.
+    Auto-push: {% if settings.auto_push %}on{% else %}off{% endif %}.
+  </footer>
+</body>
+</html>
