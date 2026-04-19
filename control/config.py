@@ -67,6 +67,20 @@ class Settings(BaseSettings):
     auto_cleanup_interval_min: int = Field(default=15, alias="AUTO_CLEANUP_INTERVAL_MIN")
     auto_cleanup_stuck_hours: int = Field(default=1, alias="AUTO_CLEANUP_STUCK_HOURS")
 
+    # Auto-internal-linking: after new products land as `live`, go back
+    # and add a "Related picks" block to each with 2-3 same-category
+    # siblings. Boosts dwell time and distributes PageRank.
+    auto_links_enabled: bool = Field(default=True, alias="AUTO_LINKS_ENABLED")
+    auto_links_interval_min: int = Field(default=30, alias="AUTO_LINKS_INTERVAL_MIN")
+    auto_links_per_item: int = Field(default=3, alias="AUTO_LINKS_PER_ITEM")
+
+    # Unsplash integration — fetches relevant hero images for pillars and
+    # articles that lack one. Free demo key at unsplash.com/developers
+    # gives 50 requests/hour which is plenty for our volume.
+    unsplash_access_key: str = Field(default="", alias="UNSPLASH_ACCESS_KEY")
+    auto_images_enabled: bool = Field(default=True, alias="AUTO_IMAGES_ENABLED")
+    auto_images_interval_min: int = Field(default=30, alias="AUTO_IMAGES_INTERVAL_MIN")
+
     # Drip publishing: keeps Google from flagging a burst pattern.
     auto_publish_enabled: bool = Field(default=False, alias="AUTO_PUBLISH_ENABLED")
     auto_publish_interval_min: int = Field(default=90, alias="AUTO_PUBLISH_INTERVAL_MIN")

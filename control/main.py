@@ -109,6 +109,8 @@ async def scheduler_run_now(job: str):
         "publish":  sched.auto_publish_job,
         "ideas":    sched.auto_ideas_job,
         "cleanup":  sched.auto_cleanup_job,
+        "links":    sched.auto_links_job,
+        "images":   sched.auto_images_job,
     }
     if job not in jobs:
         return JSONResponse({"ok": False, "error": f"unknown job: {job}"}, status_code=400)

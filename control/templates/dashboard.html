@@ -21,7 +21,11 @@
   ("ideas",    "Auto-ideas",    "brainstorm when backlog < " ~ settings.auto_ideas_min_backlog,
     settings.auto_ideas_enabled, scheduler_runs.auto_ideas),
   ("cleanup",  "Auto-cleanup",  "reset stuck items every " ~ settings.auto_cleanup_interval_min ~ "m",
-    settings.auto_cleanup_enabled, scheduler_runs.auto_cleanup)
+    settings.auto_cleanup_enabled, scheduler_runs.auto_cleanup),
+  ("links",    "Auto-links",    "add Related picks every " ~ settings.auto_links_interval_min ~ "m",
+    settings.auto_links_enabled, scheduler_runs.auto_links),
+  ("images",   "Auto-images",   "Unsplash heroes every " ~ settings.auto_images_interval_min ~ "m",
+    settings.auto_images_enabled, scheduler_runs.auto_images)
 ] %}
 
 {% block content %}
@@ -98,6 +102,8 @@
             {% elif key == 'publish' %}published {{ state.published }}
             {% elif key == 'ideas' %}inserted {{ state.inserted }} ({{ state.topic or '—' }})
             {% elif key == 'cleanup' %}reset {{ state.reset }}
+            {% elif key == 'links' %}linked {{ state.linked }}
+            {% elif key == 'images' %}found {{ state.found }}, skipped {{ state.skipped }}
             {% endif %}
           </td>
           <td>

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import subprocess
 import sys
 import time
@@ -34,6 +35,8 @@ last_runs: dict[str, dict] = {
     "auto_publish":  {"at": None, "published": 0, "error": None},
     "auto_ideas":    {"at": None, "inserted": 0, "topic": None, "error": None},
     "auto_cleanup":  {"at": None, "reset": 0, "error": None},
+    "auto_links":    {"at": None, "linked": 0, "error": None},
+    "auto_images":   {"at": None, "found": 0, "skipped": 0, "error": None},
 }
 
 
@@ -238,6 +241,155 @@ async def auto_cleanup_job() -> dict:
     return {"reset": reset, "stale_tagged": len(stale_rows)}
 
 
+async def auto_images_job() -> dict:
+    """Find heroImages for pillars and articles that lack one.
+
+    Runs for items in any stage past `draft_ready` that have content but no
+    heroImage in their markdown. Queries Unsplash once per item, injects the
+    URL into the frontmatter, and saves back to the item's edited_md so the
+    next publish cycle writes it to disk.
+    """
+    from .images import find_hero_image, inject_hero_image
+
+    if not settings.unsplash_access_key:
+        last_runs["auto_images"] = {
+            "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "found": 0, "skipped": 0,
+            "error": "UNSPLASH_ACCESS_KEY not configured",
+        }
+        return {"skipped": True, "reason": "no unsplash key"}
+
+    # Only target articles and pillars (products already get Amazon images).
+    rows = db.fetch_all(
+        "SELECT id, title, type, edited_md, draft_md, category "
+        "FROM items WHERE type IN ('pillar', 'article') "
+        "AND stage IN ('edited', 'reviewing', 'ready_to_publish', 'published', 'live') "
+        "AND (edited_md IS NOT NULL OR draft_md IS NOT NULL) "
+        "LIMIT 10"
+    )
+    found = 0
+    skipped = 0
+    for r in rows:
+        md = r["edited_md"] or r["draft_md"] or ""
+        # Skip items that already have a populated heroImage.
+        if re.search(r'heroImage:\s*"https?://', md):
+            skipped += 1
+            continue
+
+        image = await find_hero_image(
+            title=r["title"] or "",
+            target_keyword=r["category"] or "",
+        )
+        if not image:
+            skipped += 1
+            continue
+
+        new_md = inject_hero_image(md, image)
+        db.execute(
+            "UPDATE items SET edited_md = ? WHERE id = ?",
+            (new_md, r["id"]),
+        )
+        found += 1
+        log.info("auto_images: %s -> %s", r["title"][:40], image[:80])
+
+    last_runs["auto_images"] = {
+        "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "found": found, "skipped": skipped, "error": None,
+    }
+    return {"found": found, "skipped": skipped}
+
+
+async def auto_links_job() -> dict:
+    """For every item that went 'live' but doesn't yet have a Related
+    picks block in its edited_md, pick 2-3 same-category siblings, append
+    a Markdown section, rewrite the content file, git commit.
+    """
+    from .publish import _content_subdir, write_content_file, commit_and_push
+    from .config import settings as cfg
+    from pathlib import Path
+
+    # Candidate pool: live products without a "You may also like" block.
+    rows = db.fetch_all(
+        "SELECT id, asin, slug, title, category, edited_md, type "
+        "FROM items WHERE type = 'product' AND stage IN ('published', 'live') "
+        "AND (edited_md IS NULL OR edited_md NOT LIKE '%You may also like%') "
+        "LIMIT 10"
+    )
+    if not rows:
+        last_runs["auto_links"] = {
+            "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "linked": 0, "error": None,
+        }
+        return {"linked": 0, "reason": "nothing to link"}
+
+    linked_count = 0
+    per_item = settings.auto_links_per_item
+
+    for r in rows:
+        category = r["category"]
+        item_id = r["id"]
+        title_lower = (r["title"] or "").lower()
+
+        # Find same-category siblings that are also live/published.
+        siblings = db.fetch_all(
+            "SELECT slug, title FROM items "
+            "WHERE id != ? AND category = ? AND type = 'product' "
+            "AND stage IN ('published', 'live') "
+            "ORDER BY score DESC LIMIT ?",
+            (item_id, category, per_item * 3),  # over-fetch for dedup below
+        )
+        # Pick the top `per_item` that don't share suspicious duplicate
+        # substrings with the current title (avoid linking LEVOIT to LEVOIT).
+        picked = []
+        for s in siblings:
+            s_title = (s["title"] or "").lower()
+            # Skip if first 3 words overlap heavily — likely same brand/product line.
+            if len(s_title) > 0 and s_title[:20] == title_lower[:20]:
+                continue
+            picked.append(s)
+            if len(picked) >= per_item:
+                break
+        if not picked:
+            continue
+
+        # Build the Related block.
+        lines = ["", "## You may also like", ""]
+        for s in picked:
+            lines.append(f"- [{s['title']}](/products/{s['slug']}/)")
+        lines.append("")
+        block = "\n".join(lines)
+
+        new_md = (r["edited_md"] or "") + block
+        db.execute("UPDATE items SET edited_md = ? WHERE id = ?", (new_md, item_id))
+
+        # Rewrite the .md file on disk and commit.
+        try:
+            target = write_content_file(dict(r) | {"edited_md": new_md, "type": r["type"]})
+            ok, _sha, _msg = commit_and_push(
+                target, f"auto-links: related picks for {r['slug']}"
+            )
+            if ok:
+                linked_count += 1
+                db.execute(
+                    "INSERT INTO events (item_id, from_stage, to_stage, actor, note) "
+                    "VALUES (?, 'published', 'published', 'auto-links', "
+                    "'added related picks block')",
+                    (item_id,),
+                )
+        except Exception as e:
+            log.warning("auto-links write failed for id=%s: %s", item_id, e)
+            continue
+
+    last_runs["auto_links"] = {
+        "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "linked": linked_count,
+        "error": None,
+    }
+    if linked_count:
+        log.info("auto_links: added Related blocks to %d items", linked_count)
+    return {"linked": linked_count}
+
+
 async def auto_pipeline_job() -> dict:
     """Draft + critique + advance any skeleton items waiting in the queue.
     Runs the same path as the manual 'Bulk auto-pipeline' button, just
@@ -405,6 +557,8 @@ async def scheduler_loop() -> None:
     last_publish = 0.0
     last_ideas = 0.0
     last_cleanup = 0.0
+    last_links = 0.0
+    last_images = 0.0
     # Delay the network-heavy jobs so startup isn't noisy.
     scout_warmup = time.monotonic() + 120
     import_warmup = time.monotonic() + 20
@@ -412,6 +566,8 @@ async def scheduler_loop() -> None:
     publish_warmup = time.monotonic() + 180
     ideas_warmup = time.monotonic() + 240
     cleanup_warmup = time.monotonic() + 300
+    links_warmup = time.monotonic() + 360
+    images_warmup = time.monotonic() + 420
 
     while True:
         now = time.monotonic()
@@ -483,6 +639,30 @@ async def scheduler_loop() -> None:
                 log.exception("auto_publish failed")
                 last_runs["auto_publish"]["error"] = str(e)
             last_publish = now
+
+        if (
+            settings.auto_images_enabled
+            and now >= images_warmup
+            and (now - last_images) >= settings.auto_images_interval_min * 60
+        ):
+            try:
+                await auto_images_job()
+            except Exception as e:
+                log.exception("auto_images failed")
+                last_runs["auto_images"]["error"] = str(e)
+            last_images = now
+
+        if (
+            settings.auto_links_enabled
+            and now >= links_warmup
+            and (now - last_links) >= settings.auto_links_interval_min * 60
+        ):
+            try:
+                await auto_links_job()
+            except Exception as e:
+                log.exception("auto_links failed")
+                last_runs["auto_links"]["error"] = str(e)
+            last_links = now
 
         if (
             settings.auto_ideas_enabled
