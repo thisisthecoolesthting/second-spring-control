@@ -542,12 +542,17 @@ async def auto_ideas_job() -> dict:
 async def scheduler_loop() -> None:
     """Long-lived asyncio task. Exits only when the app shuts down."""
     log.info(
-        "scheduler: starting (advance=%s, scout=%s, pipeline=%s, publish=%s, ideas=%s)",
+        "scheduler: starting (advance=%s, scout=%s, import=%s, pipeline=%s, "
+        "publish=%s, ideas=%s, cleanup=%s, links=%s, images=%s)",
         settings.auto_advance_enabled,
         settings.auto_scout_enabled,
+        settings.auto_import_enabled,
         settings.auto_pipeline_enabled,
         settings.auto_publish_enabled,
         settings.auto_ideas_enabled,
+        settings.auto_cleanup_enabled,
+        settings.auto_links_enabled,
+        bool(settings.unsplash_access_key) and settings.auto_images_enabled,
     )
 
     last_advance = 0.0
