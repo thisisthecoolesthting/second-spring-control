@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from pathlib import Path
 from typing import Optional
 
@@ -10,6 +11,14 @@ from fastapi import FastAPI, Form, Request, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+
+# Force INFO level for our modules so scheduler messages land in systemd /
+# uvicorn log. Without this, the control.scheduler logger inherits
+# WARNING-level root and its info() calls are dropped.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 from . import chatgpt, db, pipeline, publish, quality, scout_bridge
 from .config import settings
@@ -93,10 +102,13 @@ async def scheduler_run_now(job: str):
     """Force-trigger a scheduler job immediately instead of waiting for the loop."""
     from . import scheduler as sched
     jobs = {
-        "advance": sched.auto_advance_job,
-        "scout":   sched.auto_scout_job,
-        "publish": sched.auto_publish_job,
-        "ideas":   sched.auto_ideas_job,
+        "advance":  sched.auto_advance_job,
+        "import":   sched.auto_import_job,
+        "pipeline": sched.auto_pipeline_job,
+        "scout":    sched.auto_scout_job,
+        "publish":  sched.auto_publish_job,
+        "ideas":    sched.auto_ideas_job,
+        "cleanup":  sched.auto_cleanup_job,
     }
     if job not in jobs:
         return JSONResponse({"ok": False, "error": f"unknown job: {job}"}, status_code=400)

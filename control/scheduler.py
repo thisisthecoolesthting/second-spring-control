@@ -27,10 +27,13 @@ log = logging.getLogger(__name__)
 
 # Module-level state so the dashboard can read last-run timestamps.
 last_runs: dict[str, dict] = {
-    "auto_advance": {"at": None, "moved": 0, "error": None},
-    "auto_scout":   {"at": None, "imported": 0, "drafted": 0, "error": None},
-    "auto_publish": {"at": None, "published": 0, "error": None},
-    "auto_ideas":   {"at": None, "inserted": 0, "topic": None, "error": None},
+    "auto_advance":  {"at": None, "moved": 0, "error": None},
+    "auto_scout":    {"at": None, "imported": 0, "drafted": 0, "error": None},
+    "auto_import":   {"at": None, "imported": 0, "skipped": 0, "last_mtime": 0, "error": None},
+    "auto_pipeline": {"at": None, "drafted": 0, "needs_human": 0, "error": None},
+    "auto_publish":  {"at": None, "published": 0, "error": None},
+    "auto_ideas":    {"at": None, "inserted": 0, "topic": None, "error": None},
+    "auto_cleanup":  {"at": None, "reset": 0, "error": None},
 }
 
 
@@ -167,6 +170,123 @@ async def auto_scout_job() -> dict:
 # Main loop
 # ---------------------------------------------------------------------------
 
+async def auto_import_job() -> dict:
+    """Auto-import from products.json when its mtime changes."""
+    path = Path(settings.scout_products_json)
+    if not path.exists():
+        last_runs["auto_import"]["at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        last_runs["auto_import"]["error"] = f"missing: {path}"
+        return {"skipped": True, "reason": "file not found"}
+
+    mtime = path.stat().st_mtime
+    prev_mtime = last_runs["auto_import"].get("last_mtime", 0) or 0
+    if mtime <= prev_mtime:
+        return {"skipped": True, "reason": "unchanged"}
+
+    result = scout_bridge.import_from_products_json(min_score=0.0)
+    last_runs["auto_import"] = {
+        "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "imported": result.get("imported", 0),
+        "skipped": result.get("skipped", 0),
+        "last_mtime": mtime,
+        "error": result.get("error"),
+    }
+    log.info("auto_import: imported=%s skipped=%s",
+             result.get("imported"), result.get("skipped"))
+    return result
+
+
+async def auto_cleanup_job() -> dict:
+    """Reset items stuck in transient stages for longer than threshold."""
+    hours = settings.auto_cleanup_stuck_hours
+    cutoff_sql = f"datetime('now', '-{hours} hour')"
+
+    # drafting: OpenAI request crashed mid-flight — bounce back to skeleton.
+    rows = db.fetch_all(
+        f"SELECT id FROM items WHERE stage = 'drafting' "
+        f"AND datetime(updated_at) < {cutoff_sql}"
+    )
+    reset = 0
+    for r in rows:
+        db.execute(
+            "UPDATE items SET stage = 'skeleton', "
+            "error = 'auto-cleanup: stuck in drafting' WHERE id = ?",
+            (r["id"],),
+        )
+        reset += 1
+
+    # editing/reviewing for > 24h likely means we forgot about them.
+    # Don't auto-advance those — just tag with note so they show in dashboard.
+    stale_rows = db.fetch_all(
+        "SELECT id FROM items WHERE stage IN ('editing', 'reviewing') "
+        "AND datetime(updated_at) < datetime('now', '-24 hour') "
+        "AND (error IS NULL OR error NOT LIKE 'auto-cleanup%')"
+    )
+    for r in stale_rows:
+        db.execute(
+            "UPDATE items SET error = 'auto-cleanup: stale >24h in editing/reviewing' "
+            "WHERE id = ?", (r["id"],)
+        )
+
+    last_runs["auto_cleanup"] = {
+        "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "reset": reset,
+        "error": None,
+    }
+    if reset or stale_rows:
+        log.info("auto_cleanup: reset=%s stale_tagged=%s", reset, len(stale_rows))
+    return {"reset": reset, "stale_tagged": len(stale_rows)}
+
+
+async def auto_pipeline_job() -> dict:
+    """Draft + critique + advance any skeleton items waiting in the queue.
+    Runs the same path as the manual 'Bulk auto-pipeline' button, just
+    batched and on a timer.
+    """
+    rows = db.fetch_all(
+        "SELECT id FROM items WHERE stage = 'skeleton' "
+        "ORDER BY priority DESC, score DESC LIMIT ?",
+        (settings.auto_pipeline_batch,),
+    )
+    if not rows:
+        last_runs["auto_pipeline"] = {
+            "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "drafted": 0, "needs_human": 0, "error": None,
+        }
+        return {"drafted": 0, "reason": "no skeletons"}
+
+    from .main import _pipeline_one
+    sem = asyncio.Semaphore(min(settings.max_parallel_drafts, len(rows)))
+
+    async def _bounded(iid):
+        async with sem:
+            return await _pipeline_one(iid)
+
+    results = await asyncio.gather(
+        *(_bounded(r["id"]) for r in rows), return_exceptions=True
+    )
+    drafted = 0
+    needs_human = 0
+    errors: list[str] = []
+    for r in results:
+        if isinstance(r, Exception):
+            errors.append(f"{type(r).__name__}: {r}")
+        elif not r.get("ok"):
+            errors.append(str(r.get("error", "unknown")))
+        elif r.get("passed"):
+            drafted += 1
+        else:
+            needs_human += 1
+
+    last_runs["auto_pipeline"] = {
+        "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "drafted": drafted,
+        "needs_human": needs_human,
+        "error": "; ".join(errors[:3]) if errors else None,
+    }
+    return {"drafted": drafted, "needs_human": needs_human, "errors": errors}
+
+
 async def auto_publish_job() -> dict:
     """Drip-publish N items per run from ready_to_publish."""
     from . import publish
@@ -270,21 +390,28 @@ async def auto_ideas_job() -> dict:
 async def scheduler_loop() -> None:
     """Long-lived asyncio task. Exits only when the app shuts down."""
     log.info(
-        "scheduler: starting (advance=%s, scout=%s, publish=%s, ideas=%s)",
+        "scheduler: starting (advance=%s, scout=%s, pipeline=%s, publish=%s, ideas=%s)",
         settings.auto_advance_enabled,
         settings.auto_scout_enabled,
+        settings.auto_pipeline_enabled,
         settings.auto_publish_enabled,
         settings.auto_ideas_enabled,
     )
 
     last_advance = 0.0
     last_scout = 0.0
+    last_import = 0.0
+    last_pipeline = 0.0
     last_publish = 0.0
     last_ideas = 0.0
+    last_cleanup = 0.0
     # Delay the network-heavy jobs so startup isn't noisy.
     scout_warmup = time.monotonic() + 120
+    import_warmup = time.monotonic() + 20
+    pipeline_warmup = time.monotonic() + 60
     publish_warmup = time.monotonic() + 180
     ideas_warmup = time.monotonic() + 240
+    cleanup_warmup = time.monotonic() + 300
 
     while True:
         now = time.monotonic()
@@ -308,6 +435,42 @@ async def scheduler_loop() -> None:
                 log.exception("auto_scout failed")
                 last_runs["auto_scout"]["error"] = str(e)
             last_scout = now
+
+        if (
+            settings.auto_import_enabled
+            and now >= import_warmup
+            and (now - last_import) >= settings.auto_import_interval_min * 60
+        ):
+            try:
+                await auto_import_job()
+            except Exception as e:
+                log.exception("auto_import failed")
+                last_runs["auto_import"]["error"] = str(e)
+            last_import = now
+
+        if (
+            settings.auto_cleanup_enabled
+            and now >= cleanup_warmup
+            and (now - last_cleanup) >= settings.auto_cleanup_interval_min * 60
+        ):
+            try:
+                await auto_cleanup_job()
+            except Exception as e:
+                log.exception("auto_cleanup failed")
+                last_runs["auto_cleanup"]["error"] = str(e)
+            last_cleanup = now
+
+        if (
+            settings.auto_pipeline_enabled
+            and now >= pipeline_warmup
+            and (now - last_pipeline) >= settings.auto_pipeline_interval_min * 60
+        ):
+            try:
+                await auto_pipeline_job()
+            except Exception as e:
+                log.exception("auto_pipeline failed")
+                last_runs["auto_pipeline"]["error"] = str(e)
+            last_pipeline = now
 
         if (
             settings.auto_publish_enabled

@@ -8,14 +8,20 @@
 {% endblock %}
 
 {% set job_rows = [
-  ("advance", "Auto-advance", "edited to ready_to_publish every " ~ settings.auto_advance_interval_sec ~ "s",
+  ("advance",  "Auto-advance",  "edited to ready_to_publish every " ~ settings.auto_advance_interval_sec ~ "s",
     settings.auto_advance_enabled, scheduler_runs.auto_advance),
-  ("scout",   "Auto-scout",   "Keepa refresh every " ~ settings.auto_scout_interval_hours ~ "h",
+  ("import",   "Auto-import",   "check products.json every " ~ settings.auto_import_interval_min ~ "m",
+    settings.auto_import_enabled, scheduler_runs.auto_import),
+  ("pipeline", "Auto-pipeline", "draft+critique batch of " ~ settings.auto_pipeline_batch ~ " every " ~ settings.auto_pipeline_interval_min ~ "m",
+    settings.auto_pipeline_enabled, scheduler_runs.auto_pipeline),
+  ("scout",    "Auto-scout",    "Keepa refresh every " ~ settings.auto_scout_interval_hours ~ "h",
     settings.auto_scout_enabled, scheduler_runs.auto_scout),
-  ("publish", "Auto-publish", settings.auto_publish_batch|string ~ " items every " ~ settings.auto_publish_interval_min ~ "m",
+  ("publish",  "Auto-publish",  settings.auto_publish_batch|string ~ " items every " ~ settings.auto_publish_interval_min ~ "m",
     settings.auto_publish_enabled, scheduler_runs.auto_publish),
-  ("ideas",   "Auto-ideas",   "brainstorm when backlog < " ~ settings.auto_ideas_min_backlog,
-    settings.auto_ideas_enabled, scheduler_runs.auto_ideas)
+  ("ideas",    "Auto-ideas",    "brainstorm when backlog < " ~ settings.auto_ideas_min_backlog,
+    settings.auto_ideas_enabled, scheduler_runs.auto_ideas),
+  ("cleanup",  "Auto-cleanup",  "reset stuck items every " ~ settings.auto_cleanup_interval_min ~ "m",
+    settings.auto_cleanup_enabled, scheduler_runs.auto_cleanup)
 ] %}
 
 {% block content %}
@@ -86,9 +92,12 @@
           <td class="small">
             {% if state.error %}<span class="error">{{ state.error[:120] }}</span>
             {% elif key == 'advance' %}moved {{ state.moved }}
+            {% elif key == 'import' %}imported {{ state.imported }}, skipped {{ state.skipped }}
+            {% elif key == 'pipeline' %}drafted {{ state.drafted }}, needs_human {{ state.needs_human }}
             {% elif key == 'scout' %}imported {{ state.imported }}, drafted {{ state.drafted }}
             {% elif key == 'publish' %}published {{ state.published }}
             {% elif key == 'ideas' %}inserted {{ state.inserted }} ({{ state.topic or '—' }})
+            {% elif key == 'cleanup' %}reset {{ state.reset }}
             {% endif %}
           </td>
           <td>

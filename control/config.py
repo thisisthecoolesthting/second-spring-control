@@ -50,6 +50,23 @@ class Settings(BaseSettings):
         default=Path("../amazon-affiliate-scout"),
         alias="SCOUT_PROJECT_DIR",
     )
+    # Auto-pipeline: draft + critique + meta + SEO on skeletons.
+    auto_pipeline_enabled: bool = Field(default=True, alias="AUTO_PIPELINE_ENABLED")
+    auto_pipeline_interval_min: int = Field(default=15, alias="AUTO_PIPELINE_INTERVAL_MIN")
+    auto_pipeline_batch: int = Field(default=4, alias="AUTO_PIPELINE_BATCH")
+
+    # Auto-import: when the scout cron updates products.json, pull fresh
+    # ASINs into the controller DB without human action. Every 5 min checks
+    # mtime; if changed, imports.
+    auto_import_enabled: bool = Field(default=True, alias="AUTO_IMPORT_ENABLED")
+    auto_import_interval_min: int = Field(default=5, alias="AUTO_IMPORT_INTERVAL_MIN")
+
+    # Auto-cleanup: reset items stuck in transient stages (drafting, editing,
+    # reviewing) for longer than the threshold. Runs every 15 min.
+    auto_cleanup_enabled: bool = Field(default=True, alias="AUTO_CLEANUP_ENABLED")
+    auto_cleanup_interval_min: int = Field(default=15, alias="AUTO_CLEANUP_INTERVAL_MIN")
+    auto_cleanup_stuck_hours: int = Field(default=1, alias="AUTO_CLEANUP_STUCK_HOURS")
+
     # Drip publishing: keeps Google from flagging a burst pattern.
     auto_publish_enabled: bool = Field(default=False, alias="AUTO_PUBLISH_ENABLED")
     auto_publish_interval_min: int = Field(default=90, alias="AUTO_PUBLISH_INTERVAL_MIN")
