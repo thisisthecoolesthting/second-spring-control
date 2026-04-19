@@ -81,6 +81,11 @@ class Settings(BaseSettings):
     auto_images_enabled: bool = Field(default=True, alias="AUTO_IMAGES_ENABLED")
     auto_images_interval_min: int = Field(default=30, alias="AUTO_IMAGES_INTERVAL_MIN")
 
+    # IndexNow — instant indexing signal to Bing, Yandex, Seznam, Naver.
+    # Key file must exist at https://<site>/<key>.txt with key as content.
+    indexnow_key: str = Field(default="f4e9c2a8b3d1647592a7c3f8e2b4d1c6", alias="INDEXNOW_KEY")
+    indexnow_enabled: bool = Field(default=True, alias="INDEXNOW_ENABLED")
+
     # Drip publishing: keeps Google from flagging a burst pattern.
     auto_publish_enabled: bool = Field(default=False, alias="AUTO_PUBLISH_ENABLED")
     auto_publish_interval_min: int = Field(default=90, alias="AUTO_PUBLISH_INTERVAL_MIN")

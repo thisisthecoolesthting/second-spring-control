@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,6 +12,8 @@ import httpx
 
 from . import db
 from .config import settings
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -132,6 +135,16 @@ async def publish_item(item_id: int) -> PublishResult:
     # Poll for liveness in the background-ish style: caller can await.
     live_url = await poll_live(item["slug"], item["type"])
     if live_url:
+        # Ping IndexNow so Bing/Yandex know about the new URL immediately.
+        # Fire-and-forget: failures here don't fail the publish.
+        try:
+            from . import indexnow
+            result = await indexnow.submit_urls([live_url])
+            if result.get("ok"):
+                log.info("indexnow: %s submitted for %s", live_url, item["slug"])
+        except Exception as e:
+            log.warning("indexnow submission failed for %s: %s", live_url, e)
+
         db.execute(
             "UPDATE items SET stage = 'live', updated_at = datetime('now') WHERE id = ?",
             (item_id,),
